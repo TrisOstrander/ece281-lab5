@@ -40,30 +40,62 @@ entity ALU is
 end ALU;
 
 architecture Behavioral of ALU is
- component ripple_adder is
-        Port ( 
-           A : in STD_LOGIC_VECTOR (7 downto 0);
+component ripple_adder is
+           Port ( A : in STD_LOGIC_VECTOR (7 downto 0);
            B : in STD_LOGIC_VECTOR (7 downto 0);
            Cin : in STD_LOGIC;
            S : out STD_LOGIC_VECTOR (7 downto 0);
-           Cout : out STD_LOGIC
-           );
+           Cout : out STD_LOGIC);
         end component ripple_adder;
-        signal w_adder_null  : std_logic;
-        signal w_adder_overflow : std_logic;
-        signal w_adder_A : std_logic_vector(7 downto 0);
-        signal w_adder_B : std_logic_vector(7 downto 0);
-        signal w_adder_result : std_logic_vector(7 downto 0);
+ signal w_adder_result : STD_LOGIC_VECTOR (7 downto 0);
+ signal w_subtracter_result : STD_LOGIC_VECTOR (7 downto 0);
+ signal w_B_inverted: STD_LOGIC_VECTOR (7 downto 0);
+ signal w_result_internal : STD_LOGIC_VECTOR(7 downto 0);
+ signal w_carry : STD_LOGIC;
+ signal w_carry1 : STD_LOGIC;
+ signal w_carry2: STD_LOGIC;
+ signal w_overflow: STD_LOGIC;
 begin
- full_adder_1: ripple_adder
-    port map(
-        A     => w_adder_A,
-        B     => w_adder_B,
-        Cin   => w_adder_null,   -- Directly to input here
+ adder: ripple_adder
+ port map(
+        A     => i_A,
+        B     => i_B,
+        Cin   => '0',
         S     => w_adder_result,
-        Cout  => w_adder_overflow
+        Cout  => w_carry1
     );
-o_result <= (i_A and i_B) when (i_op = "010") else
-            (i_A or i_B) when (i_op = "011") else
-            w_adder_result;
+ subtracter: ripple_adder
+ port map(
+        A     => i_A,
+        B     => w_B_inverted,
+        Cin   => '1',
+        S     => w_subtracter_result,
+        Cout  => w_carry2
+    );
+--Inverted B for subtraction
+w_B_inverted <= not i_B;
+--Result Calculation
+w_result_internal <= w_adder_result      when (i_op = "000") else
+                         w_subtracter_result when (i_op = "001") else
+                         (i_A and i_B)       when (i_op = "010") else
+                         (i_A or i_B)        when (i_op = "011") else
+                         (others => '0');
+o_result <= w_result_internal;
+--Carry Flag
+w_carry <= w_carry1  when (i_op = "000") else --Adder
+           w_carry2 when (i_op = "001") else --Subtracter
+           '0'; --AND + OR
+--Overflow Flag
+w_overflow <= ((i_A(7) and i_B(7) and not w_result_internal(7)) or 
+               (not i_A(7) and not i_B(7) and w_result_internal(7))) 
+               when (i_op = "000") else --Adder
+              ((i_A(7) and not i_B(7) and not w_result_internal(7)) or 
+               (not i_A(7) and i_B(7) and w_result_internal(7))) 
+               when (i_op = "001") else  --Subtracter
+              '0'; --AND + OR
+--Flag Assigments
+o_flags(3) <= w_result_internal(7); -- N
+o_flags(2) <= '1' when w_result_internal = "00000000" else '0'; -- Z
+o_flags(1) <= w_carry; -- C
+o_flags(0) <= w_overflow; --V
 end Behavioral;
