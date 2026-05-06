@@ -38,8 +38,31 @@ entity controller_fsm is
 end controller_fsm;
 
 architecture FSM of controller_fsm is
+ 
+    -- Below you create a new variable type! You also define what values that 
+    -- variable type can take on. Now you can assign a signal as 
+    -- "sm_floor" the same way you'd assign a signal as std_logic
+	type controllerState is (state0, state1, state2, state3);
+	
+	-- Here you create variables that can take on the values defined above. Neat!	
+	signal currentState, nextState : controllerState;
 
 begin
+
+	-- CONCURRENT STATEMENTS ------------------------------------------------------------------------------
+	-- Next State Logic            
+  	currentState <=  state0 when (i_reset = '1' or (currentState = state3 and i_adv = '1')) else
+	               currentState'succ(currentState) when ( i_adv = '1' and i_reset = '0' ) else -- going up
+	                currentState;
+           
+	-- Output logic
+	with currentState select
+	o_cycle <= "1000" when state0,
+	           "0100" when state1,
+	           "0010" when state2,
+	           "0001" when state3,
+	           "1000" when others;
+      
 
 
 end FSM;
