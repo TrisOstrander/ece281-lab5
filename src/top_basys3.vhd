@@ -50,7 +50,10 @@ architecture top_basys3_arch of top_basys3 is
     signal w_clk : std_logic := '0';
     signal w_action : std_logic := '0';
     signal w_cycle : std_logic_vector (3 downto 0) := "0000";
+    signal w_seg :  std_logic_vector(6 downto 0);
+    signal w_seg_parsed : std_logic_vector(6 downto 0);
     signal w_Hex : std_logic_vector (3 downto 0) := "0000";
+    signal w_bin : std_logic_vector (7 downto 0) := "00000000";
     signal w_alu_A : std_logic_vector (7 downto 0) := "00000000";
     signal w_alu_B : std_logic_vector (7 downto 0) := "00000000";
     signal w_alu_op : std_logic_vector (2 downto 0) := "000";
@@ -73,6 +76,7 @@ architecture top_basys3_arch of top_basys3 is
         Port ( 
            i_reset : in STD_LOGIC;
            i_adv : in STD_LOGIC;
+           i_clk : in STD_LOGIC;
            o_cycle : out STD_LOGIC_VECTOR (3 downto 0)
            );
     end component controller_fsm;
@@ -139,13 +143,14 @@ begin
    port map (
              i_reset => btnU,                     
              i_adv => w_action,                   
-             o_cycle => w_cycle
+             o_cycle => w_cycle,
+             i_clk  => clk
 	); 
 	TDM4_inst : TDM4
         port map( 
            i_clk		=> w_clk,
            i_reset => '0',
-           i_D3 => w_twocomp_sign_expanded,
+           i_D3 => "1111",
 		   i_D2 => w_twocomp_hund,
 		   i_D1 => w_twocomp_tens,
 		   i_D0 => w_twocomp_ones,
@@ -155,7 +160,7 @@ begin
 	sevenseg_decoder_inst : sevenseg_decoder
         port map (
             i_Hex => w_Hex,
-            o_seg_n => seg
+            o_seg_n => w_seg
         );
     ALU_inst : ALU
         port map (i_A => w_alu_A,
@@ -166,7 +171,7 @@ begin
         );
     twos_comp_inst : twos_comp
         port map (
-            i_bin => w_alu_result,
+            i_bin => w_bin,
             o_sign => w_twocomp_sign,
             o_hund => w_twocomp_hund,
             o_tens => w_twocomp_tens,
@@ -183,8 +188,28 @@ begin
 	led(15 downto 12) <= w_alu_flags;
     led(3 downto 0) <= w_cycle; 
     --Connectors
-    w_twocomp_sign_expanded <= "1111" when (w_twocomp_sign = '0') else
-                               "1110" when (w_twocomp_sign = '1') else
-                               "1111";
-	
+    w_bin <= w_alu_result when (w_cycle = "0001") else
+             w_alu_A when (w_cycle = "0100") else
+             w_alu_B when (w_cycle = "0010") else
+             "00000000";
+    w_seg_parsed <= "1111111" when (w_cycle = "1000" or (w_Hex = "1111" and w_twocomp_sign = '0')) else --No negative or empty
+                    "1111110" when (w_Hex = "1111" and w_twocomp_sign = '1') else --Negative Number
+                    w_seg;
+    seg <= w_seg_parsed;
+    process(w_clk, btnU)
+begin
+    if btnU = '1' then
+        w_alu_A <= (others => '0');
+        w_alu_B <= (others => '0');
+        w_alu_op <= (others => '0');
+    elsif rising_edge(w_clk) then
+        if w_cycle = "1000" then      -- state0: Latch Operand A
+            w_alu_A <= sw(7 downto 0);
+        elsif w_cycle = "0100" then   -- state1: Latch Operand B
+            w_alu_B <= sw(7 downto 0);
+        elsif w_cycle = "0010" then   -- state2: Latch Opcode
+            w_alu_op <= sw(2 downto 0);
+        end if;
+    end if;
+end process;
 end top_basys3_arch;

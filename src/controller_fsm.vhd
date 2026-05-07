@@ -34,35 +34,39 @@ use IEEE.STD_LOGIC_1164.ALL;
 entity controller_fsm is
     Port ( i_reset : in STD_LOGIC;
            i_adv : in STD_LOGIC;
+           i_clk : in STD_LOGIC;
            o_cycle : out STD_LOGIC_VECTOR (3 downto 0));
 end controller_fsm;
 
 architecture FSM of controller_fsm is
  
-    -- Below you create a new variable type! You also define what values that 
-    -- variable type can take on. Now you can assign a signal as 
-    -- "sm_floor" the same way you'd assign a signal as std_logic
-	type controllerState is (state0, state1, state2, state3);
-	
-	-- Here you create variables that can take on the values defined above. Neat!	
-	signal currentState, nextState : controllerState;
+    type controllerState is (state0, state1, state2, state3);
+    signal currentState : controllerState;
 
 begin
 
-	-- CONCURRENT STATEMENTS ------------------------------------------------------------------------------
-	-- Next State Logic            
-  	currentState <=  state0 when (i_reset = '1' or (currentState = state3 and i_adv = '1')) else
-	               currentState'succ(currentState) when ( i_adv = '1' and i_reset = '0' ) else -- going up
-	                currentState;
-           
-	-- Output logic
-	with currentState select
-	o_cycle <= "1000" when state0,
-	           "0100" when state1,
-	           "0010" when state2,
-	           "0001" when state3,
-	           "1000" when others;
-      
+    -- Sequential logic for state transitions
+    process(i_clk, i_reset)
+    begin
+        if i_reset = '1' then
+            currentState <= state0;
+        elsif rising_edge(i_clk) then
+            if i_adv = '1' then
+                if currentState = state3 then
+                    currentState <= state0;
+                else
+                    currentState <= controllerState'succ(currentState);
+                end if;
+            end if;
+        end if;
+    end process;
 
+    -- Concurrent logic for outputs (must be outside the process)
+    with currentState select
+        o_cycle <= "1000" when state0,
+                   "0100" when state1,
+                   "0010" when state2,
+                   "0001" when state3,
+                   "1000" when others;
 
 end FSM;
