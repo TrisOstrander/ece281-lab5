@@ -186,14 +186,17 @@ begin
 	-- CONCURRENT STATEMENTS ----------------------------
 	--Outputs
 	led(15 downto 12) <= w_alu_flags;
-    led(3 downto 0) <= w_cycle; 
+	led(3) <= w_cycle(0);
+	led(2) <= w_cycle(1);
+	led(1) <= w_cycle(2);
+    led(0) <= w_cycle(3);
     --Connectors
     w_bin <= w_alu_result when (w_cycle = "0001") else
              w_alu_A when (w_cycle = "0100") else
              w_alu_B when (w_cycle = "0010") else
              "00000000";
     w_seg_parsed <= "1111111" when (w_cycle = "1000" or (w_Hex = "1111" and w_twocomp_sign = '0')) else --No negative or empty
-                    "1111110" when (w_Hex = "1111" and w_twocomp_sign = '1') else --Negative Number
+                    "0111111" when (w_Hex = "1111") else --Negative Number
                     w_seg;
     seg <= w_seg_parsed;
     process(w_clk, btnU)
